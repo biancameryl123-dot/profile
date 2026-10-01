@@ -1,0 +1,1561 @@
+<!DOCTYPE html>
+<html lang="en" class="dark scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BIANCA VELMAYIL // 3D Media & AR/VR Developer Portfolio</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        engine: {
+                            bg: '#07090e',
+                            panel: '#0d111a',
+                            border: '#1e293b',
+                            accent: '#00f3ff',
+                            purple: '#a855f7',
+                            emerald: '#10b981',
+                            amber: '#f59e0b',
+                            rose: '#f43f5e'
+                        }
+                    },
+                    fontFamily: {
+                        mono: ['JetBrains Mono', 'monospace'],
+                        display: ['Orbitron', 'sans-serif'],
+                        sans: ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500;700&family=Orbitron:wght@400;600;800;900&display=swap" rel="stylesheet">
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <!-- Custom Aesthetics CSS -->
+    <style>
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #07090e;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1e293b;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #00f3ff;
+        }
+
+        .engine-glass {
+            background: rgba(13, 17, 26, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(0, 243, 255, 0.15);
+        }
+
+        .engine-glass-hover {
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .engine-glass-hover:hover {
+            border-color: rgba(0, 243, 255, 0.5);
+            box-shadow: 0 0 25px rgba(0, 243, 255, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .scanline-overlay {
+            background: linear-gradient(
+                rgba(18, 16, 16, 0) 50%, 
+                rgba(0, 0, 0, 0.25) 50%
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+        }
+
+        .hud-grid-pattern {
+            background-image: radial-gradient(rgba(0, 243, 255, 0.1) 1px, transparent 0);
+            background-size: 24px 24px;
+        }
+
+        .glow-text-cyan {
+            text-shadow: 0 0 10px rgba(0, 243, 255, 0.5), 0 0 20px rgba(0, 243, 255, 0.3);
+        }
+        .glow-text-purple {
+            text-shadow: 0 0 10px rgba(168, 85, 247, 0.5), 0 0 20px rgba(168, 85, 247, 0.3);
+        }
+
+        /* Custom Crosshair Cursor */
+        body {
+            cursor: default;
+        }
+        .custom-cursor {
+            pointer-events: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: 9999;
+            transform: translate(-50%, -50%);
+            transition: width 0.15s, height 0.15s, opacity 0.15s;
+        }
+
+        /* Pulse glow animation */
+        @keyframes enginePulse {
+            0%, 100% { opacity: 0.3; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.05); }
+        }
+        .animate-engine-pulse {
+            animation: enginePulse 3s infinite ease-in-out;
+        }
+
+        /* Terminal line typing indicator */
+        .cli-cursor::after {
+            content: '█';
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+    </style>
+</head>
+<body class="bg-engine-bg text-slate-200 font-sans antialiased overflow-x-hidden selection:bg-cyan-500 selection:text-black">
+
+    <!-- 3D Three.js WebGL Canvas -->
+    <canvas id="webgl-canvas" class="fixed top-0 left-0 w-full h-full z-0 outline-none"></canvas>
+
+    <!-- Scanline Subtle FX Overlay -->
+    <div class="scanline-overlay fixed top-0 left-0 w-full h-full z-10 opacity-30 pointer-events-none"></div>
+
+    <!-- Custom Engine Sci-Fi Cursor -->
+    <div id="cursor-ring" class="custom-cursor w-8 h-8 rounded-full border border-cyan-400/60 hidden md:block z-50 transition-transform duration-75"></div>
+    <div id="cursor-dot" class="custom-cursor w-1.5 h-1.5 bg-cyan-400 rounded-full hidden md:block z-50"></div>
+
+    <!-- HUD Top Navigation Bar (Unreal / Unity Workspace Style) -->
+    <header class="fixed top-0 left-0 w-full z-40 bg-engine-bg/90 border-b border-slate-800 backdrop-blur-md px-4 py-2 flex flex-wrap items-center justify-between text-xs font-mono">
+        <!-- Engine Brand Logo & Status -->
+        <div class="flex items-center space-x-3">
+            <div class="flex items-center space-x-2 text-cyan-400 font-bold font-display tracking-widest text-sm">
+                <i class="fa-solid fa-cube text-cyan-400 animate-spin" style="animation-duration: 12s;"></i>
+                <span>BIANCA_ENGINE</span>
+                <span class="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">v2.5</span>
+            </div>
+            <div class="hidden sm:flex items-center space-x-2 border-l border-slate-800 pl-3 text-slate-400">
+                <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
+                <span class="text-emerald-400 font-semibold">REALTIME DXR</span>
+            </div>
+        </div>
+
+        <!-- Editor Viewports Navigation Links -->
+        <nav class="hidden lg:flex items-center space-x-1">
+            <a href="#hero" onclick="playEngineSound('click')" class="px-3 py-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-cyan-400 transition flex items-center space-x-1.5">
+                <i class="fa-solid fa-gamepad text-slate-500"></i>
+                <span>Viewport</span>
+            </a>
+            <a href="#about" onclick="playEngineSound('click')" class="px-3 py-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-cyan-400 transition flex items-center space-x-1.5">
+                <i class="fa-solid fa-microchip text-slate-500"></i>
+                <span>Inspector</span>
+            </a>
+            <a href="#projects" onclick="playEngineSound('click')" class="px-3 py-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-cyan-400 transition flex items-center space-x-1.5">
+                <i class="fa-solid fa-folder-open text-slate-500"></i>
+                <span>Asset Browser</span>
+            </a>
+            <a href="#skills" onclick="playEngineSound('click')" class="px-3 py-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-cyan-400 transition flex items-center space-x-1.5">
+                <i class="fa-solid fa-sitemap text-slate-500"></i>
+                <span>Blueprints</span>
+            </a>
+            <a href="#education" onclick="playEngineSound('click')" class="px-3 py-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-cyan-400 transition flex items-center space-x-1.5">
+                <i class="fa-solid fa-layer-group text-slate-500"></i>
+                <span>Timeline</span>
+            </a>
+            <a href="#contact" onclick="playEngineSound('click')" class="px-3 py-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-cyan-400 transition flex items-center space-x-1.5">
+                <i class="fa-solid fa-terminal text-slate-500"></i>
+                <span>Console</span>
+            </a>
+        </nav>
+
+        <!-- Diagnostics & System Toggles -->
+        <div class="flex items-center space-x-3 text-slate-400">
+            <!-- FPS Counter -->
+            <div class="hidden md:flex items-center space-x-1 bg-slate-900/80 px-2 py-1 rounded border border-slate-800">
+                <span class="text-slate-500">FPS:</span>
+                <span id="fps-counter" class="text-emerald-400 font-bold">60</span>
+            </div>
+
+            <!-- Mouse Coordinates -->
+            <div class="hidden xl:flex items-center space-x-1 bg-slate-900/80 px-2 py-1 rounded border border-slate-800">
+                <span class="text-slate-500">XYZ:</span>
+                <span id="mouse-coords" class="text-cyan-400">0.0, 0.0</span>
+            </div>
+
+            <!-- Wireframe Toggle -->
+            <button id="wireframe-btn" title="Toggle 3D Wireframe Render Mode" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-cyan-950 text-slate-300 hover:text-cyan-400 border border-slate-700 transition flex items-center space-x-1">
+                <i class="fa-solid fa-border-none text-xs"></i>
+                <span class="hidden sm:inline">Wireframe</span>
+            </button>
+
+            <!-- Audio FX Synth Toggle -->
+            <button id="audio-toggle-btn" title="Toggle Web Audio Synthesizer Sound FX" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-purple-950 text-slate-300 hover:text-purple-300 border border-slate-700 transition flex items-center space-x-1">
+                <i id="audio-icon" class="fa-solid fa-volume-xmark text-slate-400"></i>
+                <span id="audio-status" class="hidden sm:inline">SFX: OFF</span>
+            </button>
+
+            <!-- Fullscreen Toggle -->
+            <button onclick="toggleFullScreen()" title="Fullscreen Viewport" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition">
+                <i class="fa-solid fa-expand"></i>
+            </button>
+        </div>
+    </header>
+
+    <!-- Left Engine Floating Tools Bar (Desktop) -->
+    <aside class="fixed left-4 top-24 z-30 hidden lg:flex flex-col space-y-3 p-2 bg-engine-panel/80 backdrop-blur-md rounded-lg border border-slate-800 text-slate-400 shadow-2xl">
+        <button title="Select Tool (3D Raycaster Active)" class="p-2.5 rounded-md hover:bg-cyan-500/20 hover:text-cyan-400 transition bg-slate-800/80 text-cyan-400">
+            <i class="fa-solid fa-arrow-pointer text-sm"></i>
+        </button>
+        <button title="Translate Transform Gizmo" onclick="triggerGizmoPulse('translate')" class="p-2.5 rounded-md hover:bg-cyan-500/20 hover:text-cyan-400 transition">
+            <i class="fa-solid fa-arrows-up-down-left-right text-sm"></i>
+        </button>
+        <button title="Rotate Object Matrix" onclick="triggerGizmoPulse('rotate')" class="p-2.5 rounded-md hover:bg-cyan-500/20 hover:text-cyan-400 transition">
+            <i class="fa-solid fa-rotate text-sm"></i>
+        </button>
+        <button title="Scale Mesh Geometry" onclick="triggerGizmoPulse('scale')" class="p-2.5 rounded-md hover:bg-cyan-500/20 hover:text-cyan-400 transition">
+            <i class="fa-solid fa-up-right-and-down-left-from-center text-sm"></i>
+        </button>
+        <div class="w-full h-px bg-slate-800 my-1"></div>
+        <button title="Lighting Inspector" onclick="cycleLightingTheme()" class="p-2.5 rounded-md hover:bg-purple-500/20 hover:text-purple-400 transition">
+            <i class="fa-solid fa-lightbulb text-sm"></i>
+        </button>
+        <button title="Particle Flow Multiplier" onclick="boostParticles()" class="p-2.5 rounded-md hover:bg-emerald-500/20 hover:text-emerald-400 transition">
+            <i class="fa-solid fa-wand-magic-sparkles text-sm"></i>
+        </button>
+    </aside>
+
+    <!-- Main Interactive Content Overlay Container -->
+    <main class="relative z-20 pt-20 pb-24 px-4 sm:px-8 max-w-7xl mx-auto space-y-32">
+
+        <!-- ================= HERO VIEWPORT SECTION ================= -->
+        <section id="hero" class="min-h-[85vh] flex flex-col justify-center items-start pt-8">
+            <div class="w-full max-w-4xl space-y-6">
+                <!-- Cyber status badge -->
+                <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-mono">
+                    <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                    <span>ENGINE_VIEWPORT // ACTIVE_SESSION</span>
+                </div>
+
+                <!-- Main Name & Title -->
+                <div class="space-y-2">
+                    <h1 class="text-4xl sm:text-6xl lg:text-7xl font-black font-display tracking-tight text-white uppercase leading-none">
+                        BIANCA <span class="bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-500 bg-clip-text text-transparent glow-text-cyan">VELMAYIL</span>
+                    </h1>
+                    <p class="text-lg sm:text-2xl font-mono text-cyan-300/90 font-medium tracking-wide">
+                        Digital Media & Animation Student <span class="text-purple-400">|</span> 3D Modeler <span class="text-purple-400">|</span> AR/VR Experience Designer
+                    </p>
+                </div>
+
+                <!-- Descriptive Summary Teaser -->
+                <p class="text-slate-300 text-base sm:text-lg max-w-2xl leading-relaxed font-sans">
+                    Crafting immersive visual experiences, rich 3D character narratives, and spatial AR/VR environments. Merging traditional creative visual storytelling with cutting-edge realtime graphics tools.
+                </p>
+
+                <!-- Quick Action Button Row -->
+                <div class="flex flex-wrap gap-4 pt-4 font-mono text-sm">
+                    <a href="#projects" onclick="playEngineSound('click')" class="px-6 py-3.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold transition-all shadow-lg shadow-cyan-500/25 flex items-center space-x-2 group">
+                        <i class="fa-solid fa-play group-hover:translate-x-1 transition-transform"></i>
+                        <span>LAUNCH ASSET BROWSER</span>
+                    </a>
+                    <a href="#about" onclick="playEngineSound('click')" class="px-6 py-3.5 rounded-lg engine-glass hover:bg-slate-800 text-cyan-300 font-semibold transition border border-cyan-500/30 flex items-center space-x-2">
+                        <i class="fa-solid fa-sliders text-cyan-400"></i>
+                        <span>INSPECT PROFILE</span>
+                    </a>
+                    <a href="#contact" onclick="playEngineSound('click')" class="px-6 py-3.5 rounded-lg bg-purple-900/40 hover:bg-purple-800/60 text-purple-200 font-semibold border border-purple-500/40 transition flex items-center space-x-2">
+                        <i class="fa-solid fa-terminal text-purple-400"></i>
+                        <span>EXECUTE CONSOLE</span>
+                    </a>
+                </div>
+
+                <!-- Quick Metric HUD Cards -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-8 font-mono text-xs">
+                    <div class="engine-glass p-3 rounded-lg border border-slate-800">
+                        <div class="text-slate-500">DEGREE</div>
+                        <div class="text-cyan-400 font-bold text-sm truncate">B.Voc Animation</div>
+                        <div class="text-[10px] text-slate-400">Expected 2027</div>
+                    </div>
+                    <div class="engine-glass p-3 rounded-lg border border-slate-800">
+                        <div class="text-slate-500">LOCATION</div>
+                        <div class="text-purple-400 font-bold text-sm">Bengaluru, KA</div>
+                        <div class="text-[10px] text-slate-400">India</div>
+                    </div>
+                    <div class="engine-glass p-3 rounded-lg border border-slate-800">
+                        <div class="text-slate-500">CORE FOCUS</div>
+                        <div class="text-emerald-400 font-bold text-sm">3D & AR/VR</div>
+                        <div class="text-[10px] text-slate-400">Spatial Media</div>
+                    </div>
+                    <div class="engine-glass p-3 rounded-lg border border-slate-800">
+                        <div class="text-slate-500">INSTITUTION</div>
+                        <div class="text-amber-400 font-bold text-sm truncate">St. Joseph's Uni</div>
+                        <div class="text-[10px] text-slate-400">B.Voc Program</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= INSPECTOR / ABOUT SECTION ================= -->
+        <section id="about" class="scroll-mt-24 space-y-8">
+            <!-- Section Header -->
+            <div class="flex items-center space-x-3 border-b border-slate-800 pb-4">
+                <div class="w-10 h-10 rounded-lg bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 font-mono text-lg font-bold">
+                    01
+                </div>
+                <div>
+                    <h2 class="text-2xl sm:text-3xl font-bold font-display uppercase tracking-wider text-white">ENGINE INSPECTOR // ABOUT BIANCA</h2>
+                    <p class="text-xs font-mono text-slate-400">PROFILE_SUMMARY & CORE_COMPETENCIES</p>
+                </div>
+            </div>
+
+            <!-- Main Inspector Window Layout -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <!-- Left Details Box -->
+                <div class="lg:col-span-7 engine-glass rounded-xl p-6 space-y-6 border border-slate-800 relative overflow-hidden">
+                    <div class="flex items-center justify-between border-b border-slate-800/80 pb-3 font-mono text-xs text-slate-400">
+                        <span class="flex items-center space-x-2">
+                            <i class="fa-solid fa-user-gear text-cyan-400"></i>
+                            <span>OBJECT_PROPERTIES :: BIANCA_VELMAYIL</span>
+                        </span>
+                        <span class="text-emerald-400">STATUS: ACTIVE</span>
+                    </div>
+
+                    <p class="text-slate-300 leading-relaxed text-sm sm:text-base font-sans">
+                        Creative and detail-oriented <strong class="text-cyan-300">Digital Media and Animation student</strong> with a strong foundation in visual storytelling, 3D modeling, and video production. Passionate about bringing imaginative concepts to life through emerging technologies like <strong class="text-purple-300">AR/VR</strong> and traditional mediums like <strong class="text-emerald-300">graphic novels</strong>. Eager to leverage artistic skills and technical proficiency to contribute to innovative media projects.
+                    </p>
+
+                    <!-- Property Table Grid -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 font-mono text-xs bg-slate-950/60 p-4 rounded-lg border border-slate-800/80">
+                        <div class="space-y-1">
+                            <div class="text-slate-500 uppercase">Primary Track</div>
+                            <div class="text-slate-200 font-semibold">Digital Media & Animation</div>
+                        </div>
+                        <div class="space-y-1">
+                            <div class="text-slate-500 uppercase">Specializations</div>
+                            <div class="text-slate-200 font-semibold">3D Modeling, Rigging, AR/VR</div>
+                        </div>
+                        <div class="space-y-1">
+                            <div class="text-slate-500 uppercase">Direct Email</div>
+                            <div class="text-cyan-400 font-semibold truncate">biancameryl123@gmail.com</div>
+                        </div>
+                        <div class="space-y-1">
+                            <div class="text-slate-500 uppercase">Location Node</div>
+                            <div class="text-slate-200 font-semibold">Bengaluru, Karnataka</div>
+                        </div>
+                    </div>
+
+                    <!-- Highlight Badges -->
+                    <div class="flex flex-wrap gap-2 font-mono text-xs pt-2">
+                        <span class="px-3 py-1 rounded bg-slate-800 text-cyan-300 border border-slate-700">#VisualStorytelling</span>
+                        <span class="px-3 py-1 rounded bg-slate-800 text-purple-300 border border-slate-700">#SpatialDesign</span>
+                        <span class="px-3 py-1 rounded bg-slate-800 text-emerald-300 border border-slate-700">#CharacterDesign</span>
+                        <span class="px-3 py-1 rounded bg-slate-800 text-amber-300 border border-slate-700">#VideoProduction</span>
+                    </div>
+                </div>
+
+                <!-- Right Diagnostic Radar & Stats Panel -->
+                <div class="lg:col-span-5 space-y-4">
+                    <!-- Core Performance Meters -->
+                    <div class="engine-glass rounded-xl p-6 border border-slate-800 space-y-4 font-mono text-xs">
+                        <div class="text-slate-400 font-bold uppercase tracking-wider flex justify-between">
+                            <span>Visual Proficiency Radar</span>
+                            <i class="fa-solid fa-chart-radar text-purple-400"></i>
+                        </div>
+
+                        <!-- Meter 1 -->
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-slate-300">
+                                <span>3D Modeling & Mesh Topology</span>
+                                <span class="text-cyan-400">92%</span>
+                            </div>
+                            <div class="w-full bg-slate-900 rounded-full h-2 overflow-hidden border border-slate-800">
+                                <div class="bg-gradient-to-r from-cyan-500 to-blue-500 h-2 rounded-full w-[92%] transition-all duration-1000"></div>
+                            </div>
+                        </div>
+
+                        <!-- Meter 2 -->
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-slate-300">
+                                <span>AR/VR Spatial Experience Design</span>
+                                <span class="text-purple-400">88%</span>
+                            </div>
+                            <div class="w-full bg-slate-900 rounded-full h-2 overflow-hidden border border-slate-800">
+                                <div class="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full w-[88%] transition-all duration-1000"></div>
+                            </div>
+                        </div>
+
+                        <!-- Meter 3 -->
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-slate-300">
+                                <span>Storyboarding & Graphic Narrative</span>
+                                <span class="text-emerald-400">95%</span>
+                            </div>
+                            <div class="w-full bg-slate-900 rounded-full h-2 overflow-hidden border border-slate-800">
+                                <div class="bg-gradient-to-r from-emerald-500 to-teal-400 h-2 rounded-full w-[95%] transition-all duration-1000"></div>
+                            </div>
+                        </div>
+
+                        <!-- Meter 4 -->
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-slate-300">
+                                <span>Post-Production & Video Editing</span>
+                                <span class="text-amber-400">90%</span>
+                            </div>
+                            <div class="w-full bg-slate-900 rounded-full h-2 overflow-hidden border border-slate-800">
+                                <div class="bg-gradient-to-r from-amber-500 to-rose-500 h-2 rounded-full w-[90%] transition-all duration-1000"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Personal Details Card -->
+                    <div class="engine-glass rounded-xl p-4 border border-slate-800 font-mono text-xs flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 rounded bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-300">
+                                <i class="fa-solid fa-cake-candles"></i>
+                            </div>
+                            <div>
+                                <div class="text-slate-400">DATE OF BIRTH</div>
+                                <div class="text-slate-200 font-bold">23 September 2005</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-slate-400">PARENTS</div>
+                            <div class="text-slate-300 text-[11px]">Antony S. & Meryl V.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= ASSET BROWSER / PROJECTS ================= -->
+        <section id="projects" class="scroll-mt-24 space-y-8">
+            <!-- Section Header -->
+            <div class="flex flex-wrap items-center justify-between border-b border-slate-800 pb-4 gap-4">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-lg bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400 font-mono text-lg font-bold">
+                        02
+                    </div>
+                    <div>
+                        <h2 class="text-2xl sm:text-3xl font-bold font-display uppercase tracking-wider text-white">ASSET BROWSER // KEY PROJECTS</h2>
+                        <p class="text-xs font-mono text-slate-400">INTERACTIVE_MEDIA_OBJECTS & SHOWCASE_PACKS</p>
+                    </div>
+                </div>
+
+                <!-- Asset Filter Category Tabs -->
+                <div class="flex items-center space-x-1 font-mono text-xs bg-slate-900/90 p-1 rounded-lg border border-slate-800">
+                    <button class="px-3 py-1.5 rounded bg-purple-600 text-white font-semibold">ALL ASSETS</button>
+                    <button class="px-3 py-1.5 rounded text-slate-400 hover:text-slate-200 transition">3D & ANIM</button>
+                    <button class="px-3 py-1.5 rounded text-slate-400 hover:text-slate-200 transition">AR/VR</button>
+                    <button class="px-3 py-1.5 rounded text-slate-400 hover:text-slate-200 transition">MEDIA</button>
+                </div>
+            </div>
+
+            <!-- Projects 2x2 Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                <!-- Project 1: Original Graphic Novel -->
+                <div class="engine-glass engine-glass-hover rounded-xl p-6 border border-slate-800 flex flex-col justify-between space-y-6 relative group">
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between font-mono text-xs">
+                            <span class="px-2.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                                <i class="fa-solid fa-book-open mr-1"></i> GRAPHIC_NOVEL
+                            </span>
+                            <span class="text-amber-400"><i class="fa-solid fa-spinner animate-spin mr-1"></i> Current Project</span>
+                        </div>
+                        <h3 class="text-xl font-bold text-white font-display group-hover:text-cyan-400 transition-colors">
+                            Original Graphic Novel Series
+                        </h3>
+                        <p class="text-slate-300 text-sm leading-relaxed font-sans">
+                            Conceptualizing and developing an original graphic novel, encompassing full narrative structure, character design, worldbuilding, and panel layouts. Combining traditional hand drawing with digital rendering to create a compelling visual story.
+                        </p>
+                    </div>
+
+                    <!-- Tech Tags & Inspect Button -->
+                    <div class="space-y-4 pt-2">
+                        <div class="flex flex-wrap gap-2 font-mono text-[11px] text-slate-400">
+                            <span class="px-2 py-0.5 rounded bg-slate-800/80">Traditional Drawing</span>
+                            <span class="px-2 py-0.5 rounded bg-slate-800/80">Digital Rendering</span>
+                            <span class="px-2 py-0.5 rounded bg-slate-800/80">Character Design</span>
+                            <span class="px-2 py-0.5 rounded bg-slate-800/80">Panel Layouts</span>
+                        </div>
+
+                        <button onclick="openProjectModal('novel')" class="w-full py-2.5 rounded-lg bg-slate-800 hover:bg-cyan-500 hover:text-slate-950 text-cyan-300 font-mono text-xs font-bold transition flex items-center justify-center space-x-2 border border-slate-700">
+                            <i class="fa-solid fa-magnifying-glass-plus"></i>
+                            <span>INSPECT ASSET BLUEPRINT</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Project 2: 3D Modeling & Animation -->
+                <div class="engine-glass engine-glass-hover rounded-xl p-6 border border-slate-800 flex flex-col justify-between space-y-6 relative group">
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between font-mono text-xs">
+                            <span class="px-2.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+                                <i class="fa-solid fa-cube mr-1"></i> 3D_ANIMATION
+                            </span>
+                            <span class="text-slate-400">COMPLETED_ASSET</span>
+                        </div>
+                        <h3 class="text-xl font-bold text-white font-display group-hover:text-cyan-400 transition-colors">
+                            3D Modeling & Character Rigging
+                        </h3>
+                        <p class="text-slate-300 text-sm leading-relaxed font-sans">
+                            Designed and rendered stylized 3D assets using industry-standard software, focusing on topology optimization, UV texturing, and realistic lighting. Animated 3D models with an emphasis on expressive movement, physics, and skeletal rigging.
+                        </p>
+                    </div>
+
+                    <!-- Tech Tags & Inspect Button -->
+                    <div class="space-y-4 pt-2">
+                        <div class="flex flex-wrap gap-2 font-mono text-[11px] text-slate-400">
+                            <span class="px-2 py-0.5 rounded bg-slate-800/80">Mesh Topology</span>
+                            <span class="px-2 py-0.5 rounded bg-slate-800/80">Texturing & Shaders</span>
+                            <span class="px-2 py-0.5 rounded bg-slate-800/80">Physics Rigging</span>
+                            <span class="px-2 py-0.5 rounded bg-slate-800/80">Lighting Setup</span>
+                        </div>
+
+                        <button onclick="openProjectModal('3d')" class="w-full py-2.5 rounded-lg bg-slate-800 hover:bg-cyan-500 hover:text-slate-950 text-cyan-300 font-mono text-xs font-bold transition flex items-center justify-center space-x-2 border border-slate-700">
+                            <i class="fa-solid fa-magnifying-glass-plus"></i>
+                            <span>INSPECT ASSET BLUEPRINT</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Project 3: Short Film Production -->
+                <div class="engine-glass engine-glass-hover rounded-xl p-6 border border-slate-800 flex flex-col justify-between space-y-6 relative group">
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between font-mono text-xs">
+                            <span class="px-2.5 py-0.5 rounded bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                                <i class="fa-solid fa-clapperboard mr-1"></i> FILM_PRODUCTION
+                            </span>
+                            <span class="text-slate-400">POST_PRODUCED</span>
+                        </div>
+                        <h3 class="text-xl font-bold text-white font-display group-hover:text-cyan-400 transition-colors">
+                            Cinematic Short Film Production
+                        </h3>
+                        <p class="text-slate-300 text-sm leading-relaxed font-sans">
+                            Contributed to the end-to-end production of a narrative short film, from initial storyboarding to final post-production cut. Applied advanced video editing techniques, cinematic color grading, audio syncing, and visual pacing.
+                        </p>
+                    </div>
+
+                    <!-- Tech Tags & Inspect Button -->
+                    <div class="space-y-4 pt-2">
+                        <div class="flex flex-wrap gap-2 font-mono text-[11px] text-slate-400">
+                            <span class="px-2 py-0.5 rounded bg-slate-800/80">Storyboarding</span>
+                            <span class="px-2 py-0.5 rounded bg-slate-800/80">Color Grading</span>
+                            <span class="px-2 py-0.5 rounded bg-slate-800/80">Audio Syncing</span>
+                            <span class="px-2 py-0.5 rounded bg-slate-800/80">Post-Production</span>
+                        </div>
+
+                        <button onclick="openProjectModal('film')" class="w-full py-2.5 rounded-lg bg-slate-800 hover:bg-cyan-500 hover:text-slate-950 text-cyan-300 font-mono text-xs font-bold transition flex items-center justify-center space-x-2 border border-slate-700">
+                            <i class="fa-solid fa-magnifying-glass-plus"></i>
+                            <span>INSPECT ASSET BLUEPRINT</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Project 4: AR/VR Experience Design -->
+                <div class="engine-glass engine-glass-hover rounded-xl p-6 border border-slate-800 flex flex-col justify-between space-y-6 relative group">
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between font-mono text-xs">
+                            <span class="px-2.5 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                                <i class="fa-solid fa-vr-cardboard mr-1"></i> SPATIAL_AR_VR
+                            </span>
+                            <span class="text-cyan-400">IMMERSIVE_APP</span>
+                        </div>
+                        <h3 class="text-xl font-bold text-white font-display group-hover:text-cyan-400 transition-colors">
+                            AR/VR Interactive Spatial Environments
+                        </h3>
+                        <p class="text-slate-300 text-sm leading-relaxed font-sans">
+                            Explored immersive media by developing interactive Augmented Reality (AR) and Virtual Reality (VR) environments. Integrated interactive 3D digital models into real-world overlays to enhance user engagement and spatial storytelling.
+                        </p>
+                    </div>
+
+                    <!-- Tech Tags & Inspect Button -->
+                    <div class="space-y-4 pt-2">
+                        <div class="flex flex-wrap gap-2 font-mono text-[11px] text-slate-400">
+                            <span class="px-2 py-0.5 rounded bg-slate-800/80">Spatial UI</span>
+                            <span class="px-2 py-0.5 rounded bg-slate-800/80">AR Real-World Overlay</span>
+                            <span class="px-2 py-0.5 rounded bg-slate-800/80">VR Interaction</span>
+                            <span class="px-2 py-0.5 rounded bg-slate-800/80">Spatial Storytelling</span>
+                        </div>
+
+                        <button onclick="openProjectModal('arvr')" class="w-full py-2.5 rounded-lg bg-slate-800 hover:bg-cyan-500 hover:text-slate-950 text-cyan-300 font-mono text-xs font-bold transition flex items-center justify-center space-x-2 border border-slate-700">
+                            <i class="fa-solid fa-magnifying-glass-plus"></i>
+                            <span>INSPECT ASSET BLUEPRINT</span>
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ================= BLUEPRINT / SKILLS ================= -->
+        <section id="skills" class="scroll-mt-24 space-y-8">
+            <!-- Section Header -->
+            <div class="flex items-center space-x-3 border-b border-slate-800 pb-4">
+                <div class="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 font-mono text-lg font-bold">
+                    03
+                </div>
+                <div>
+                    <h2 class="text-2xl sm:text-3xl font-bold font-display uppercase tracking-wider text-white">BLUEPRINT VISUALIZER // SKILLS MATRIX</h2>
+                    <p class="text-xs font-mono text-slate-400">TECHNICAL_NODES, CREATIVE_GRAPH & SOFT_ATTRIBUTES</p>
+                </div>
+            </div>
+
+            <!-- Blueprint Editor Styled Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 font-mono">
+
+                <!-- Node 1: Technical & Digital -->
+                <div class="engine-glass rounded-xl p-6 border border-cyan-500/30 space-y-5 relative">
+                    <div class="flex items-center space-x-3 border-b border-slate-800 pb-3">
+                        <i class="fa-solid fa-laptop-code text-cyan-400 text-lg"></i>
+                        <div>
+                            <h3 class="text-base font-bold text-white">Technical & Digital</h3>
+                            <span class="text-[10px] text-cyan-400">SYSTEM_NODE_01</span>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3 text-xs">
+                        <div class="p-2.5 rounded bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+                            <span class="text-slate-200">Video Editing</span>
+                            <span class="text-cyan-400 font-bold">EXPERT</span>
+                        </div>
+                        <div class="p-2.5 rounded bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+                            <span class="text-slate-200">3D Modeling & Rigging</span>
+                            <span class="text-cyan-400 font-bold">ADVANCED</span>
+                        </div>
+                        <div class="p-2.5 rounded bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+                            <span class="text-slate-200">2D / 3D Animation</span>
+                            <span class="text-cyan-400 font-bold">ADVANCED</span>
+                        </div>
+                        <div class="p-2.5 rounded bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+                            <span class="text-slate-200">AR / VR Development</span>
+                            <span class="text-cyan-400 font-bold">INTERMEDIATE</span>
+                        </div>
+                        <div class="p-2.5 rounded bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+                            <span class="text-slate-200">Post-Production Effects</span>
+                            <span class="text-cyan-400 font-bold">ADVANCED</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Node 2: Creative & Artistic -->
+                <div class="engine-glass rounded-xl p-6 border border-purple-500/30 space-y-5 relative">
+                    <div class="flex items-center space-x-3 border-b border-slate-800 pb-3">
+                        <i class="fa-solid fa-palette text-purple-400 text-lg"></i>
+                        <div>
+                            <h3 class="text-base font-bold text-white">Creative & Artistic</h3>
+                            <span class="text-[10px] text-purple-400">SYSTEM_NODE_02</span>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3 text-xs">
+                        <div class="p-2.5 rounded bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+                            <span class="text-slate-200">Traditional Drawing</span>
+                            <span class="text-purple-400 font-bold">HIGH_SKILL</span>
+                        </div>
+                        <div class="p-2.5 rounded bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+                            <span class="text-slate-200">Digital Illustration</span>
+                            <span class="text-purple-400 font-bold">HIGH_SKILL</span>
+                        </div>
+                        <div class="p-2.5 rounded bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+                            <span class="text-slate-200">Storyboarding</span>
+                            <span class="text-purple-400 font-bold">EXPERT</span>
+                        </div>
+                        <div class="p-2.5 rounded bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+                            <span class="text-slate-200">Graphic Narrative Design</span>
+                            <span class="text-purple-400 font-bold">SPECIALIST</span>
+                        </div>
+                        <div class="p-2.5 rounded bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+                            <span class="text-slate-200">Character Concepting</span>
+                            <span class="text-purple-400 font-bold">HIGH_SKILL</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Node 3: Soft Skills & Execution -->
+                <div class="engine-glass rounded-xl p-6 border border-emerald-500/30 space-y-5 relative">
+                    <div class="flex items-center space-x-3 border-b border-slate-800 pb-3">
+                        <i class="fa-solid fa-brain text-emerald-400 text-lg"></i>
+                        <div>
+                            <h3 class="text-base font-bold text-white">Soft Skills</h3>
+                            <span class="text-[10px] text-emerald-400">SYSTEM_NODE_03</span>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3 text-xs">
+                        <div class="p-2.5 rounded bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+                            <span class="text-slate-200">Creative Problem Solving</span>
+                            <span class="text-emerald-400 font-bold">OPTIMAL</span>
+                        </div>
+                        <div class="p-2.5 rounded bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+                            <span class="text-slate-200">Project Management</span>
+                            <span class="text-emerald-400 font-bold">EFFICIENT</span>
+                        </div>
+                        <div class="p-2.5 rounded bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+                            <span class="text-slate-200">Visual Communication</span>
+                            <span class="text-emerald-400 font-bold">FLUENT</span>
+                        </div>
+                        <div class="p-2.5 rounded bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+                            <span class="text-slate-200">Adaptability</span>
+                            <span class="text-emerald-400 font-bold">HIGH</span>
+                        </div>
+                        <div class="p-2.5 rounded bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+                            <span class="text-slate-200">Cross-Disciplinary Teamwork</span>
+                            <span class="text-emerald-400 font-bold">STRONG</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ================= TIMELINE / EDUCATION ================= -->
+        <section id="education" class="scroll-mt-24 space-y-8">
+            <!-- Section Header -->
+            <div class="flex items-center space-x-3 border-b border-slate-800 pb-4">
+                <div class="w-10 h-10 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 font-mono text-lg font-bold">
+                    04
+                </div>
+                <div>
+                    <h2 class="text-2xl sm:text-3xl font-bold font-display uppercase tracking-wider text-white">LEVEL SEQUENCE // ACADEMIC TIMELINE</h2>
+                    <p class="text-xs font-mono text-slate-400">EDUCATION_NODES & MILESTONES</p>
+                </div>
+            </div>
+
+            <!-- Timeline Sequence Track -->
+            <div class="relative pl-6 sm:pl-10 border-l-2 border-slate-800 space-y-10">
+
+                <!-- Milestone 1 -->
+                <div class="relative group">
+                    <div class="absolute -left-[31px] sm:-left-[47px] top-1 w-6 h-6 rounded-full bg-slate-950 border-2 border-cyan-400 flex items-center justify-center text-cyan-400 text-xs">
+                        <i class="fa-solid fa-graduation-cap text-[10px]"></i>
+                    </div>
+
+                    <div class="engine-glass rounded-xl p-6 border border-slate-800 space-y-2">
+                        <div class="flex flex-wrap items-center justify-between gap-2 font-mono text-xs">
+                            <span class="px-2.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-bold">
+                                EXPECTED GRADUATION: 2027
+                            </span>
+                            <span class="text-slate-400"><i class="fa-solid fa-location-dot mr-1"></i> Bengaluru, Karnataka</span>
+                        </div>
+                        <h3 class="text-xl font-bold text-white font-display">St. Joseph's University</h3>
+                        <p class="text-cyan-400 font-mono text-sm">B.Voc in Digital Media and Animation</p>
+                        <p class="text-slate-300 text-sm leading-relaxed pt-2 font-sans">
+                            Comprehensive program covering advanced 3D visual design, animation principles, interactive digital storytelling, post-production media, and spatial media technology.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Milestone 2 -->
+                <div class="relative group">
+                    <div class="absolute -left-[31px] sm:-left-[47px] top-1 w-6 h-6 rounded-full bg-slate-950 border-2 border-purple-400 flex items-center justify-center text-purple-400 text-xs">
+                        <i class="fa-solid fa-building-columns text-[10px]"></i>
+                    </div>
+
+                    <div class="engine-glass rounded-xl p-6 border border-slate-800 space-y-2">
+                        <div class="flex flex-wrap items-center justify-between gap-2 font-mono text-xs">
+                            <span class="px-2.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold">
+                                GRADUATED: 2024
+                            </span>
+                            <span class="text-slate-400"><i class="fa-solid fa-location-dot mr-1"></i> Bengaluru, Karnataka</span>
+                        </div>
+                        <h3 class="text-xl font-bold text-white font-display">Mount Carmel PU College</h3>
+                        <p class="text-purple-300 font-mono text-sm">Pre-University Course (PUC)</p>
+                        <p class="text-slate-300 text-sm leading-relaxed pt-2 font-sans">
+                            Foundational academic stream fostering early analytical, media, and artistic interest leading into higher digital media specialization.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Milestone 3 -->
+                <div class="relative group">
+                    <div class="absolute -left-[31px] sm:-left-[47px] top-1 w-6 h-6 rounded-full bg-slate-950 border-2 border-slate-600 flex items-center justify-center text-slate-400 text-xs">
+                        <i class="fa-solid fa-school text-[10px]"></i>
+                    </div>
+
+                    <div class="engine-glass rounded-xl p-6 border border-slate-800 space-y-2">
+                        <div class="flex flex-wrap items-center justify-between gap-2 font-mono text-xs">
+                            <span class="px-2.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 font-bold">
+                                GRADUATED: 2021
+                            </span>
+                            <span class="text-slate-400"><i class="fa-solid fa-location-dot mr-1"></i> Bengaluru, Karnataka</span>
+                        </div>
+                        <h3 class="text-xl font-bold text-white font-display">Baldwin Girls' High School</h3>
+                        <p class="text-slate-400 font-mono text-sm">High School Diploma (10th Standard)</p>
+                        <p class="text-slate-300 text-sm leading-relaxed pt-2 font-sans">
+                            Secondary school education focusing on core sciences, humanities, and fine arts activities.
+                        </p>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ================= SUB-SYSTEMS / HOBBIES ================= -->
+        <section class="space-y-8">
+            <!-- Section Header -->
+            <div class="flex items-center space-x-3 border-b border-slate-800 pb-4">
+                <div class="w-10 h-10 rounded-lg bg-pink-500/10 border border-pink-500/30 flex items-center justify-center text-pink-400 font-mono text-lg font-bold">
+                    05
+                </div>
+                <div>
+                    <h2 class="text-2xl sm:text-3xl font-bold font-display uppercase tracking-wider text-white">SUB-SYSTEMS // HOBBIES & INTERESTS</h2>
+                    <p class="text-xs font-mono text-slate-400">CREATIVE_PASSIONS & EXTRA_CURRICULAR_NODES</p>
+                </div>
+            </div>
+
+            <!-- Hobby Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+                <!-- Drawing -->
+                <div class="engine-glass rounded-xl p-6 border border-slate-800 space-y-4 hover:border-pink-500/40 transition">
+                    <div class="w-12 h-12 rounded-lg bg-pink-500/20 border border-pink-500/40 flex items-center justify-center text-pink-400 text-xl">
+                        <i class="fa-solid fa-pen-nib"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-white font-display">Drawing & Illustration</h3>
+                    <p class="text-slate-300 text-sm leading-relaxed font-sans">
+                        Specializing in character design and scenic environment illustrations, blending fantasy world building with anatomical precision.
+                    </p>
+                </div>
+
+                <!-- Singing -->
+                <div class="engine-glass rounded-xl p-6 border border-slate-800 space-y-4 hover:border-cyan-500/40 transition">
+                    <div class="w-12 h-12 rounded-lg bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400 text-xl">
+                        <i class="fa-solid fa-microphone-lines"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-white font-display">Vocal Performance</h3>
+                    <p class="text-slate-300 text-sm leading-relaxed font-sans">
+                        Active interest in vocal music, melody composition, and exploring audio harmony that complements visual storytelling media.
+                    </p>
+                </div>
+
+                <!-- Video Editing Experiments -->
+                <div class="engine-glass rounded-xl p-6 border border-slate-800 space-y-4 hover:border-purple-500/40 transition">
+                    <div class="w-12 h-12 rounded-lg bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-purple-400 text-xl">
+                        <i class="fa-solid fa-film"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-white font-display">Video Editing FX</h3>
+                    <p class="text-slate-300 text-sm leading-relaxed font-sans">
+                        Experimenting with motion graphics transitions, narrative pacing, rhythmic cutting, and dynamic visual effects in personal creative projects.
+                    </p>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ================= DEVELOPER CONSOLE / CONTACT ================= -->
+        <section id="contact" class="scroll-mt-24 space-y-8">
+            <!-- Section Header -->
+            <div class="flex items-center space-x-3 border-b border-slate-800 pb-4">
+                <div class="w-10 h-10 rounded-lg bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 font-mono text-lg font-bold">
+                    06
+                </div>
+                <div>
+                    <h2 class="text-2xl sm:text-3xl font-bold font-display uppercase tracking-wider text-white">DEVELOPER CONSOLE // COMM LINK</h2>
+                    <p class="text-xs font-mono text-slate-400">INTERACTIVE_TERMINAL & DIRECT_CONTACT</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+                <!-- Left Column: Interactive Command Terminal Simulator -->
+                <div class="lg:col-span-7 bg-slate-950 rounded-xl border border-slate-800 p-4 font-mono text-xs space-y-4 shadow-2xl flex flex-col justify-between">
+                    <div>
+                        <!-- Terminal Window Titlebar -->
+                        <div class="flex items-center justify-between border-b border-slate-800 pb-3 text-slate-400">
+                            <div class="flex items-center space-x-2">
+                                <span class="w-3 h-3 rounded-full bg-rose-500/80 inline-block"></span>
+                                <span class="w-3 h-3 rounded-full bg-amber-500/80 inline-block"></span>
+                                <span class="w-3 h-3 rounded-full bg-emerald-500/80 inline-block"></span>
+                                <span class="ml-2 font-bold text-slate-300">BIANCA_CLI_TERMINAL v2.5</span>
+                            </div>
+                            <span>UTF-8 // BASH</span>
+                        </div>
+
+                        <!-- Quick Command Chips -->
+                        <div class="flex flex-wrap gap-2 pt-3">
+                            <button onclick="runCommand('help')" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700">
+                                $ help
+                            </button>
+                            <button onclick="runCommand('about')" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-purple-400 border border-slate-700">
+                                $ about
+                            </button>
+                            <button onclick="runCommand('projects')" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-700">
+                                $ projects
+                            </button>
+                            <button onclick="runCommand('contact')" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700">
+                                $ contact
+                            </button>
+                            <button onclick="runCommand('clear')" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 border border-slate-700">
+                                $ clear
+                            </button>
+                        </div>
+
+                        <!-- Console Output Screen -->
+                        <div id="terminal-output" class="mt-4 space-y-2 h-56 overflow-y-auto text-slate-300 pr-2 leading-relaxed">
+                            <div class="text-slate-500">BIANCA_CORE OS initialized. Type <span class="text-cyan-400 font-bold">'help'</span> for available engine commands.</div>
+                            <div class="text-cyan-400">$ system_status</div>
+                            <div class="text-emerald-400">✓ All renderer sub-systems operating normally. Ready for direct communication.</div>
+                        </div>
+                    </div>
+
+                    <!-- Input Command Prompt line -->
+                    <form onsubmit="handleTerminalSubmit(event)" class="flex items-center space-x-2 border-t border-slate-800 pt-3">
+                        <span class="text-cyan-400 font-bold">bianca@engine:~$</span>
+                        <input id="terminal-input" type="text" placeholder="Type command here..." class="bg-transparent text-slate-100 flex-1 outline-none font-mono text-xs focus:ring-0">
+                        <button type="submit" class="px-3 py-1 bg-cyan-500 text-slate-950 font-bold rounded hover:bg-cyan-400 transition">
+                            EXEC
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Right Column: Direct Contact Card -->
+                <div class="lg:col-span-5 engine-glass rounded-xl p-6 border border-slate-800 space-y-6 flex flex-col justify-between">
+                    <div class="space-y-4">
+                        <div class="flex items-center space-x-3 text-cyan-400 font-mono text-xs">
+                            <i class="fa-solid fa-satellite-dish text-base"></i>
+                            <span class="font-bold uppercase tracking-wider">DIRECT COMMUNICATION LINK</span>
+                        </div>
+
+                        <h3 class="text-2xl font-bold text-white font-display">Let's Create Together</h3>
+                        <p class="text-slate-300 text-sm leading-relaxed font-sans">
+                            Open to internships, project collaborations, 3D modeling commissions, and AR/VR spatial design projects.
+                        </p>
+
+                        <!-- Primary Contact Methods -->
+                        <div class="space-y-3 font-mono text-xs">
+                            <!-- Email -->
+                            <div class="p-3 bg-slate-900/90 rounded-lg border border-slate-800 flex items-center justify-between">
+                                <div class="flex items-center space-x-3 overflow-hidden">
+                                    <i class="fa-regular fa-envelope text-cyan-400 text-base"></i>
+                                    <span class="text-slate-200 truncate font-semibold">biancameryl123@gmail.com</span>
+                                </div>
+                                <button onclick="copyEmailToClipboard()" title="Copy email address" class="ml-2 px-2.5 py-1 rounded bg-slate-800 hover:bg-cyan-500 hover:text-slate-950 text-cyan-400 border border-slate-700 transition">
+                                    <i class="fa-regular fa-copy"></i>
+                                </button>
+                            </div>
+
+                            <!-- Location -->
+                            <div class="p-3 bg-slate-900/90 rounded-lg border border-slate-800 flex items-center space-x-3">
+                                <i class="fa-solid fa-location-dot text-purple-400 text-base"></i>
+                                <span class="text-slate-200 font-semibold">Bengaluru, Karnataka, India</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Direct Email Launch Button -->
+                    <a href="mailto:biancameryl123@gmail.com" onclick="playEngineSound('click')" class="w-full py-3.5 rounded-lg bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-400 hover:to-purple-500 text-slate-950 font-mono text-xs font-bold transition text-center block shadow-lg shadow-cyan-500/20">
+                        <i class="fa-solid fa-paper-plane mr-2"></i> OPEN MAIL CLIENT
+                    </a>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="border-t border-slate-800/80 pt-8 flex flex-col sm:flex-row items-center justify-between font-mono text-xs text-slate-500 gap-4">
+            <div>
+                © 2026 BIANCA VELMAYIL. BUILT WITH THREE.JS & TAILWIND.
+            </div>
+            <div class="flex items-center space-x-4">
+                <span>ENGINE_STATUS :: ONLINE</span>
+                <span class="text-cyan-400">FPS: 60</span>
+            </div>
+        </footer>
+
+    </main>
+
+    <!-- Project Asset Details Modal -->
+    <div id="project-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-300">
+        <div class="engine-glass rounded-xl border border-cyan-500/40 w-full max-w-2xl p-6 space-y-6 relative max-h-[90vh] overflow-y-auto">
+            <button onclick="closeProjectModal()" class="absolute top-4 right-4 text-slate-400 hover:text-cyan-400 transition text-lg">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+
+            <div class="flex items-center space-x-2 font-mono text-xs text-cyan-400">
+                <i class="fa-solid fa-microchip"></i>
+                <span id="modal-category">ASSET_SPECIFICATION</span>
+            </div>
+
+            <h3 id="modal-title" class="text-2xl font-bold font-display text-white">Project Title</h3>
+
+            <p id="modal-description" class="text-slate-300 text-sm leading-relaxed font-sans">
+                Detailed description content goes here.
+            </p>
+
+            <div class="space-y-3 font-mono text-xs">
+                <div class="text-slate-400 uppercase font-bold">Technical Features & Process:</div>
+                <ul id="modal-features" class="list-disc list-inside text-slate-300 space-y-1 bg-slate-950/60 p-3 rounded-lg border border-slate-800">
+                    <!-- Dynamic Features list -->
+                </ul>
+            </div>
+
+            <div class="flex justify-end pt-2">
+                <button onclick="closeProjectModal()" class="px-5 py-2 rounded bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-mono text-xs font-bold transition">
+                    CLOSE INSPECTOR
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let audioCtx = null;
+        let soundEnabled = false;
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContext();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playEngineSound(type) {
+            if (!soundEnabled) return;
+            initAudio();
+
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                const now = audioCtx.currentTime;
+
+                if (type === 'hover') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(440, now);
+                    osc.frequency.exponentialRampToValueAtTime(880, now + 0.05);
+                    gain.gain.setValueAtTime(0.03, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+                    osc.start(now);
+                    osc.stop(now + 0.05);
+                } else if (type === 'click') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(1200, now);
+                    osc.frequency.exponentialRampToValueAtTime(300, now + 0.08);
+                    gain.gain.setValueAtTime(0.08, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+                    osc.start(now);
+                    osc.stop(now + 0.08);
+                } else if (type === 'terminal') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(800, now);
+                    gain.gain.setValueAtTime(0.02, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+                    osc.start(now);
+                    osc.stop(now + 0.03);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // Audio toggle handler
+        document.getElementById('audio-toggle-btn').addEventListener('click', function() {
+            soundEnabled = !soundEnabled;
+            const icon = document.getElementById('audio-icon');
+            const status = document.getElementById('audio-status');
+
+            if (soundEnabled) {
+                initAudio();
+                icon.className = 'fa-solid fa-volume-high text-purple-400';
+                status.innerText = 'SFX: ON';
+                playEngineSound('click');
+            } else {
+                icon.className = 'fa-solid fa-volume-xmark text-slate-400';
+                status.innerText = 'SFX: OFF';
+            }
+        });
+
+        const cursorDot = document.getElementById('cursor-dot');
+        const cursorRing = document.getElementById('cursor-ring');
+        const mouseCoordsEl = document.getElementById('mouse-coords');
+
+        let mouseX = 0, mouseY = 0;
+        let ringX = 0, ringY = 0;
+
+        window.addEventListener('mousemove', (e) => {
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+
+            cursorDot.style.left = `${mouseX}px`;
+            cursorDot.style.top = `${mouseY}px`;
+
+            if (mouseCoordsEl) {
+                mouseCoordsEl.innerText = `${(mouseX / window.innerWidth * 10 - 5).toFixed(1)}, ${(-mouseY / window.innerHeight * 10 + 5).toFixed(1)}`;
+            }
+        });
+
+        function animateCursorRing() {
+            ringX += (mouseX - ringX) * 0.2;
+            ringY += (mouseY - ringY) * 0.2;
+
+            cursorRing.style.left = `${ringX}px`;
+            cursorRing.style.top = `${ringY}px`;
+
+            requestAnimationFrame(animateCursorRing);
+        }
+        animateCursorRing();
+
+        // Add hover triggers to interactive elements
+        document.querySelectorAll('button, a, input').forEach(el => {
+            el.addEventListener('mouseenter', () => {
+                cursorRing.classList.add('scale-150', 'border-cyan-400', 'bg-cyan-400/10');
+                playEngineSound('hover');
+            });
+            el.addEventListener('mouseleave', () => {
+                cursorRing.classList.remove('scale-150', 'border-cyan-400', 'bg-cyan-400/10');
+            });
+        });
+    </script>
+
+    <script>
+        let scene, camera, renderer;
+        let gridPlane, particleSystem;
+        let floatingObjects = [];
+        let raycaster, mouse3D;
+        let hoveredObject = null;
+        let wireframeMode = false;
+        let currentLightingIndex = 0;
+
+        // FPS Calculation
+        let frameCount = 0;
+        let lastFpsUpdate = performance.now();
+        const fpsCounter = document.getElementById('fps-counter');
+
+        function initThreeJS() {
+            const canvas = document.getElementById('webgl-canvas');
+
+            // Scene
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x07090e, 0.025);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 3, 18);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+            // Raycaster & Mouse Vector
+            raycaster = new THREE.Raycaster();
+            mouse3D = new THREE.Vector2();
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const cyanLight = new THREE.PointLight(0x00f3ff, 2, 50);
+            cyanLight.position.set(-10, 10, 5);
+            scene.add(cyanLight);
+
+            const purpleLight = new THREE.PointLight(0xa855f7, 2, 50);
+            purpleLight.position.set(10, -5, 5);
+            scene.add(purpleLight);
+
+            // Sci-Fi Wireframe Grid Floor
+            const gridHelper = new THREE.GridHelper(100, 50, 0x00f3ff, 0x1e293b);
+            gridHelper.position.y = -4;
+            scene.add(gridHelper);
+
+            // Floating 3D Sci-Fi Polyhedra Mesh Assets
+            createFloating3DAssets();
+
+            // Particle Starfield / Space Dust
+            createDustParticles();
+
+            // Window Resize Listener
+            window.addEventListener('resize', onWindowResize);
+
+            // Mouse move listener for Raycasting & Parallax
+            window.addEventListener('mousemove', onMouseMove3D);
+
+            // Scroll listener for camera movement depth
+            window.addEventListener('scroll', onScroll3D);
+
+            // Start animation loop
+            animateThreeJS();
+        }
+
+        function createFloating3DAssets() {
+            const geometries = [
+                new THREE.IcosahedronGeometry(1.2, 0),
+                new THREE.OctahedronGeometry(1.5, 0),
+                new THREE.TorusKnotGeometry(1, 0.3, 100, 16),
+                new THREE.DodecahedronGeometry(1.3, 0),
+                new THREE.TetrahedronGeometry(1.4, 0)
+            ];
+
+            const colors = [0x00f3ff, 0xa855f7, 0x10b981, 0xf59e0b, 0xf43f5e];
+
+            // Instantiate objects along scroll depth
+            const positions = [
+                { x: -6, y: 3, z: 8 },
+                { x: 6, y: -1, z: 2 },
+                { x: -7, y: -6, z: -5 },
+                { x: 7, y: -12, z: -12 },
+                { x: -5, y: -18, z: -18 },
+                { x: 5, y: -24, z: -25 }
+            ];
+
+            positions.forEach((pos, idx) => {
+                const geom = geometries[idx % geometries.length];
+                const color = colors[idx % colors.length];
+
+                // Outer Mesh
+                const material = new THREE.MeshStandardMaterial({
+                    color: color,
+                    wireframe: true,
+                    emissive: color,
+                    emissiveIntensity: 0.3,
+                    roughness: 0.2,
+                    metalness: 0.8
+                });
+
+                const mesh = new THREE.Mesh(geom, material);
+                mesh.position.set(pos.x, pos.y, pos.z);
+                mesh.userData = {
+                    baseY: pos.y,
+                    rotSpeedX: (Math.random() - 0.5) * 0.015,
+                    rotSpeedY: (Math.random() - 0.5) * 0.015,
+                    originalColor: color
+                };
+
+                scene.add(mesh);
+                floatingObjects.push(mesh);
+            });
+        }
+
+        function createDustParticles() {
+            const count = 1200;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(count * 3);
+
+            for (let i = 0; i < count * 3; i += 3) {
+                positions[i] = (Math.random() - 0.5) * 80;
+                positions[i + 1] = (Math.random() - 0.5) * 80;
+                positions[i + 2] = (Math.random() - 0.5) * 80;
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+            const material = new THREE.PointsMaterial({
+                color: 0x00f3ff,
+                size: 0.15,
+                transparent: true,
+                opacity: 0.6
+            });
+
+            particleSystem = new THREE.Points(geometry, material);
+            scene.add(particleSystem);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function onMouseMove3D(e) {
+            mouse3D.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouse3D.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+            // Parallax camera sway target
+            camera.position.x += (mouse3D.x * 1.2 - camera.position.x) * 0.05;
+        }
+
+        let scrollY = 0;
+        function onScroll3D() {
+            scrollY = window.scrollY;
+            const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+            const scrollFraction = scrollY / (maxScroll || 1);
+
+            // Move camera down and deeper into 3D scene on scroll
+            camera.position.y = 3 - scrollFraction * 25;
+            camera.position.z = 18 - scrollFraction * 15;
+        }
+
+        document.getElementById('wireframe-btn').addEventListener('click', function() {
+            wireframeMode = !wireframeMode;
+            floatingObjects.forEach(obj => {
+                obj.material.wireframe = wireframeMode;
+            });
+            playEngineSound('click');
+        });
+
+        function cycleLightingTheme() {
+            currentLightingIndex = (currentLightingIndex + 1) % 3;
+            if (currentLightingIndex === 0) {
+                scene.fog.color.setHex(0x07090e);
+                renderer.setClearColor(0x07090e, 0);
+            } else if (currentLightingIndex === 1) {
+                scene.fog.color.setHex(0x0f091c);
+            } else {
+                scene.fog.color.setHex(0x061214);
+            }
+            playEngineSound('click');
+        }
+
+        function boostParticles() {
+            if (particleSystem) {
+                particleSystem.material.size = particleSystem.material.size === 0.15 ? 0.35 : 0.15;
+            }
+            playEngineSound('click');
+        }
+
+        function triggerGizmoPulse(type) {
+            floatingObjects.forEach(obj => {
+                if (type === 'rotate') obj.rotation.y += 1.5;
+                if (type === 'scale') {
+                    obj.scale.set(1.5, 1.5, 1.5);
+                    setTimeout(() => obj.scale.set(1, 1, 1), 600);
+                }
+            });
+            playEngineSound('click');
+        }
+
+        function animateThreeJS() {
+            requestAnimationFrame(animateThreeJS);
+
+            const time = performance.now() * 0.001;
+
+            // Rotate floating meshes
+            floatingObjects.forEach((obj, idx) => {
+                obj.rotation.x += obj.userData.rotSpeedX;
+                obj.rotation.y += obj.userData.rotSpeedY;
+                obj.position.y = obj.userData.baseY + Math.sin(time + idx) * 0.4;
+            });
+
+            // Rotate particle dust
+            if (particleSystem) {
+                particleSystem.rotation.y = time * 0.02;
+            }
+
+            // Raycasting hover check
+            raycaster.setFromCamera(mouse3D, camera);
+            const intersects = raycaster.intersectObjects(floatingObjects);
+
+            if (intersects.length > 0) {
+                if (hoveredObject !== intersects[0].object) {
+                    if (hoveredObject) hoveredObject.material.emissiveIntensity = 0.3;
+                    hoveredObject = intersects[0].object;
+                    hoveredObject.material.emissiveIntensity = 1.0;
+                    playEngineSound('hover');
+                }
+            } else {
+                if (hoveredObject) hoveredObject.material.emissiveIntensity = 0.3;
+                hoveredObject = null;
+            }
+
+            // FPS Counter
+            frameCount++;
+            const now = performance.now();
+            if (now - lastFpsUpdate >= 1000) {
+                fpsCounter.innerText = frameCount;
+                frameCount = 0;
+                lastFpsUpdate = now;
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // Initialize Three.js on page load
+        window.onload = function() {
+            initThreeJS();
+        };
+    </script>
+
+    <script>
+        const projectModalData = {
+            'novel': {
+                category: 'GRAPHIC_NOVEL // CREATIVE_STORYTELLING',
+                title: 'Original Graphic Novel Project',
+                description: 'Conceptualizing and developing an original graphic novel series, encompassing narrative structure, character design, and panel layouts. Combining traditional pencil drawing techniques with modern digital rendering in Photoshop/Procreate.',
+                features: [
+                    'Full world-building documentation and character profile sheets',
+                    'Digital paneling, pacing, and visual dialogue flow',
+                    'Hybrid workflow: Hand-drawn pencil sketches scanned & digitally painted',
+                    'Color script design reflecting story emotional arcs'
+                ]
+            },
+            '3d': {
+                category: '3D_ASSETS // TOPOLOGY_&_RIGGING',
+                title: '3D Modeling & Character Rigging',
+                description: 'Designed and rendered stylized 3D assets using industry-standard tools (Blender / Maya). Focused on efficient edge-flow mesh topology, UV unwrapping, custom PBR texturing, and expressive skeletal rigging.',
+                features: [
+                    'Clean quad-based geometry suitable for realtime game engines',
+                    'PBR textures created with diffuse, normal, and roughness maps',
+                    'Skeletal rigging with inverse kinematics (IK) for character poses',
+                    'Realistic lighting and camera render passes'
+                ]
+            },
+            'film': {
+                category: 'FILM_PRODUCTION // POST_EDITING',
+                title: 'Short Film Production & Color Grading',
+                description: 'End-to-end production of a narrative short film. Led storyboarding, shot framing, non-linear video editing, cinematic color grading, and audio syncing.',
+                features: [
+                    'Shot list preparation and scene storyboarding',
+                    'Advanced Premiere Pro / DaVinci Resolve color grading',
+                    'Audio noise reduction, Foley sound design, and soundtrack sync',
+                    'Export optimized for web distribution and festivals'
+                ]
+            },
+            'arvr': {
+                category: 'SPATIAL_MEDIA // AR_VR_EXPERIENCE',
+                title: 'AR/VR Interactive Spatial Environments',
+                description: 'Explored immersive media by developing interactive Augmented Reality (AR) and Virtual Reality (VR) prototypes. Integrated 3D models into real-world environment overlays.',
+                features: [
+                    'Spatial UI/UX design optimized for 3D navigation',
+                    'Real-world surface tracking & interactive object placement',
+                    'Optimized low-poly 3D assets for smooth mobile AR frame rates',
+                    'Immersive audio and gesture-triggered interactions'
+                ]
+            }
+        };
+
+        function openProjectModal(key) {
+            const data = projectModalData[key];
+            if (!data) return;
+
+            document.getElementById('modal-category').innerText = data.category;
+            document.getElementById('modal-title').innerText = data.title;
+            document.getElementById('modal-description').innerText = data.description;
+
+            const list = document.getElementById('modal-features');
+            list.innerHTML = '';
+            data.features.forEach(f => {
+                const li = document.createElement('li');
+                li.innerText = f;
+                list.appendChild(li);
+            });
+
+            const modal = document.getElementById('project-modal');
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.remove('opacity-0'), 10);
+            playEngineSound('click');
+        }
+
+        function closeProjectModal() {
+            const modal = document.getElementById('project-modal');
+            modal.classList.add('opacity-0');
+            setTimeout(() => modal.classList.add('hidden'), 300);
+            playEngineSound('click');
+        }
+
+        function copyEmailToClipboard() {
+            const email = "biancameryl123@gmail.com";
+            const tempInput = document.createElement('input');
+            tempInput.value = email;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+
+            playEngineSound('click');
+
+            // Show temporary toast or output in terminal
+            const output = document.getElementById('terminal-output');
+            const div = document.createElement('div');
+            div.className = 'text-emerald-400 font-bold';
+            div.innerText = '✓ COPIED "biancameryl123@gmail.com" TO CLIPBOARD!';
+            output.appendChild(div);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function runCommand(cmd) {
+            const input = document.getElementById('terminal-input');
+            input.value = cmd;
+            handleTerminalSubmit(new Event('submit'));
+        }
+
+        function handleTerminalSubmit(e) {
+            e.preventDefault();
+            const input = document.getElementById('terminal-input');
+            const cmd = input.value.trim().toLowerCase();
+            if (!cmd) return;
+
+            const output = document.getElementById('terminal-output');
+
+            // Echo command
+            const cmdLine = document.createElement('div');
+            cmdLine.className = 'text-cyan-400 font-bold';
+            cmdLine.innerText = `$ ${cmd}`;
+            output.appendChild(cmdLine);
+
+            playEngineSound('terminal');
+
+            // Command logic
+            const response = document.createElement('div');
+            response.className = 'text-slate-300';
+
+            switch (cmd) {
+                case 'help':
+                    response.innerHTML = `Available commands:<br>
+                    <span class="text-cyan-300">about</span> - Display profile summary<br>
+                    <span class="text-purple-300">skills</span> - List core technical & creative skills<br>
+                    <span class="text-emerald-300">projects</span> - Display asset project breakdown<br>
+                    <span class="text-amber-300">contact</span> - Show contact details<br>
+                    <span class="text-rose-300">clear</span> - Clear terminal screen`;
+                    break;
+                case 'about':
+                    response.innerText = "Bianca Velmayil | Digital Media & Animation student at St. Joseph's University, Bengaluru. Specializing in 3D modeling, storyboarding, AR/VR spatial design, and video editing.";
+                    break;
+                case 'skills':
+                    response.innerText = "Skills: Video Editing, 3D Modeling/Rigging, 2D/3D Animation, AR/VR Experience Design, Traditional & Digital Illustration, Storyboarding, Project Management.";
+                    break;
+                case 'projects':
+                    response.innerText = "Projects: 1. Original Graphic Novel | 2. 3D Modeling & Animation | 3. Short Film Production | 4. AR/VR Interactive Spatial Environments.";
+                    break;
+                case 'contact':
+                    response.innerText = "Email: biancameryl123@gmail.com | Location: Bengaluru, Karnataka, India.";
+                    break;
+                case 'clear':
+                    output.innerHTML = '';
+                    input.value = '';
+                    return;
+                default:
+                    response.innerText = `Command not recognized: '${cmd}'. Type 'help' for options.`;
+            }
+
+            output.appendChild(response);
+            output.scrollTop = output.scrollHeight;
+            input.value = '';
+        }
+
+        // Toggle Fullscreen helper
+        function toggleFullScreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+            playEngineSound('click');
+        }
+    </script>
+</body>
+</html>
